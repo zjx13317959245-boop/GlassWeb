@@ -1,0 +1,38 @@
+name: Build GlassWeb IPA (unsigned)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Select Xcode
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build iOS app
+        run: |
+          set -o pipefail
+          xcodebuild -project GlassWeb.xcodeproj -scheme GlassWeb -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tee build.log
+      - name: Package unsigned IPA
+        run: |
+          set -e
+          APP_PATH=build/DerivedData/Build/Products/Release-iphoneos/GlassWeb.app
+          test -d "$APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/GlassWeb.app
+          zip -qry GlassWeb-unsigned.ipa Payload
+          test -s GlassWeb-unsigned.ipa
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlassWeb-unsigned-IPA
+          path: GlassWeb-unsigned.ipa
+          retention-days: 7
